@@ -23,7 +23,7 @@ StopWDT     mov.w   #WDTPW|WDTHOLD,&WDTCTL  ; Stop watchdog timer
 ;-------------------------------------------------------------------------------
 ; Main loop here
 ;-------------------------------------------------------------------------------
-;	R10 -> NÚMERO FINAL
+;	R10 -> NÃšMERO FINAL
 		mov #0x0000,R5
 		mov #0x0001,R6
 		call #FIB16
