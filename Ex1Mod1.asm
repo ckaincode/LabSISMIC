@@ -24,7 +24,7 @@ StopWDT     mov.w   #WDTPW|WDTHOLD,&WDTCTL  ; Stop watchdog timer
 ; Main loop here
 ;-------------------------------------------------------------------------------
 
-; R5 -> ponteiro para o vetor, R6 retorna o menor elemento e R7 a sua frequência, R8 -> Letra a ser comparada
+; R5 -> ponteiro para o vetor, R6 retorna o menor elemento e R7 a sua frequÃªncia, R8 -> Letra a ser comparada
 ; R9 -> Contador
 
 
