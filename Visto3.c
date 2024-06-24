@@ -155,7 +155,7 @@ void GPIOconfig(){
 void configadc(){
     volatile unsigned char *pt;
     volatile unsigned int cont;
-    ADC12CTL0 &= ADC12ENC; //Desabilitar para configuração
+    ADC12CTL0 &= ~ADC12ENC; //Desabilitar para configuração
     ADC12CTL0 = ADC12ON; //ligar adc
     ADC12CTL1 = ADC12CONSEQ_3 | // Multichannel com rep
                 ADC12SHS_1 |    //Acionamento pelo Timer A0.1
