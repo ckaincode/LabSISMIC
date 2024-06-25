@@ -3,7 +3,6 @@
 #include <stdio.h>
 
 #define BR32 32768 //32 hertz com smCLK
-#define PASSOVOLT 41 //PWM com SMCLK para o servo
 #define BR10K 105
 #define BR50 20971  //50hz
 #define BR100K 11
@@ -25,10 +24,12 @@ unsigned char flag = 0;
 int vrx,vry = 0;
 int tensx,tensy = 0;
 int decx,decy = 0;
+int minxD,minyD = 0;
 int maxxI,maxyI = 0;
 int minxI,minyI = 0;
 int maxxD,maxyD = 0;
-int minxD,minyD = 0;
+char minxDstr[20];
+
 
 void debounce(long x){
     volatile long i;
@@ -119,17 +120,17 @@ void lcd_inic(){
 
 }
 
-void lcdWrite(char *str){
+void lcdWrite(char *strlcd){
     int cont = 0;
-    while (!(*str == '\0')){
-        if ((cont == 16) || (*str == '\n')){
+    while (!(*strlcd == '\0')){
+        if ((cont == 16) || (*strlcd == '\n')){
             lcdbyte(0xC0, 0);
             cont = 0;
-            str++;
+            strlcd++;
             continue;
         }
-        lcdbyte(*str, 1);
-        str++;
+        lcdbyte(*strlcd, 1);
+        strlcd++;
         cont++;
     }
 }
@@ -153,7 +154,7 @@ void GPIOconfig(){
 }
 
 void configadc(){
-    volatile unsigned char *pt;
+    volatile unsigned char *pt1;
     volatile unsigned int cont;
     ADC12CTL0 &= ~ADC12ENC; //Desabilitar para configuração
     ADC12CTL0 = ADC12ON; //ligar adc
@@ -162,15 +163,15 @@ void configadc(){
                 ADC12CSTARTADD_0 | //MEM0
                 ADC12SSEL_3; //SMCLK
     ADC12CTL2 = ADC12RES_2; //12 Bits bits
-    pt = &ADC12MCTL0;
+    pt1 = &ADC12MCTL0;
     for(cont = 0; cont <= 7; cont++){
         if(cont % 2 == 0){
-            *pt = ADC12SREF_0 | ADC12INCH_1;
+            *pt1 = ADC12SREF_0 | ADC12INCH_1;
         }
         else{
-            *pt = ADC12SREF_0 | ADC12INCH_2;
+            *pt1 = ADC12SREF_0 | ADC12INCH_2;
         }
-        ++pt;
+        ++pt1;
     }
     ADC12MCTL7 |= ADC12EOS;
     ADC12IE |= ADC12IE7;
@@ -207,6 +208,103 @@ int sw_mon(){
     return FALSE;
 }
 
+void USCI_A1_config(){
+    UCA1CTL1 = UCSWRST;
+    UCA1CTL1 = 0;
+    UCA1BRW = 6;
+    UCA1MCTL |= UCBRF_13 | UCOS16;
+    P4SEL |= BIT4;
+    UCA1CTL1 = UCSSEL_2;
+}
+
+void bt_char(char c){
+    while((UCA1IFG&UCTXIFG) == 0);
+    UCA1TXBUF = c;
+}
+
+void bt_str(char *vet){
+    unsigned int i = 0;
+    while (vet[i] != '\0'){
+        bt_char(vet[i++]);
+    }
+}
+
+/*
+void uart_att(char* buffer, int *ct, int mediax, int mediay, char caso){
+    if (*ct < 10){
+        switch(caso){
+        case 1:
+            snprintf(buffer,sizeof(buffer),"000%d\n",mediay);
+            break;
+        case 2:
+            snprintf(buffer,sizeof(buffer),"000%d\n",mediay);
+            break;
+        case 3:
+            snprintf(buffer,sizeof(buffer),"000%d\n",mediay);
+            break;
+        case 4:
+            snprintf(buffer,sizeof(buffer),"000%d\n",mediay);
+            break;
+        }
+
+    }
+    else if (*ct < 100){
+        switch(caso){
+        case 1:
+            snprintf(buffer,sizeof(buffer),"00%d\n",mediay);
+            break;
+        case 2:
+            snprintf(buffer,sizeof(buffer),"00%d\n",mediay);
+            break;
+        case 3:
+            snprintf(buffer,sizeof(buffer),"00%d\n",mediay);
+            break;
+        case 4:
+            snprintf(buffer,sizeof(buffer),"00%d\n",mediay);
+            break;
+        }
+    }
+    else if (*ct < 1000){
+        switch(caso){
+        case 1:
+            snprintf(buffer,sizeof(buffer),"0%d\n",mediay);
+            break;
+        case 2:
+            snprintf(buffer,sizeof(buffer),"0%d\n",mediay);
+            break;
+        case 3:
+            snprintf(buffer,sizeof(buffer),"0%d\n",mediay);
+            break;
+        case 4:
+            snprintf(buffer,sizeof(buffer),"0%d\n",mediay);
+            break;
+        }
+    }
+    else{
+        switch(caso){
+        case 1:
+            snprintf(buffer,sizeof(buffer),"%d\n",mediay);
+            break;
+        case 2:
+            snprintf(buffer,sizeof(buffer),"%d\n",mediay);
+            break;
+        case 3:
+            snprintf(buffer,sizeof(buffer),"%d\n",mediay);
+            break;
+        case 4:
+            snprintf(buffer,sizeof(buffer),"%d\n",mediay);
+            break;
+        }
+    }
+
+    if(*ct == 9999){
+        *ct = 0;
+    }
+    else{
+        *ct = *ct + 1;
+    }
+}*/
+
 #pragma vector = ADC12_VECTOR
 __interrupt void isr_media(){
     volatile unsigned int *pt;
@@ -231,11 +329,29 @@ __interrupt void isr_media(){
     vry = somaY >>2;
     maxxI = (int)(0.0008*maxx);
     maxyI = (int)(0.0008*maxy);
-    minxI = (int)(0.0008*minx);
+    minxI = maxxI;
     minyI = (int)(0.0008*miny);
-    maxxD = (int)(100*((0.0008*maxx) - maxxI));
-    maxyD = (int)(100*((0.0008*maxy) - maxyI));
-    minxD = (int)(100*((0.0008*minx) - minxI));
+    maxxD = ((int)(100*((0.0008*maxx) - maxxI)));
+    maxyD = ((int)(100*((0.0008*maxy) - maxyI)));
+    /*if(maxxD - 20 < 0){
+        minxI = (maxxI - 1 >= 0) ? maxxI - 1 : 0;
+        minxD = (maxxI > 0) ?  100 - maxxD : 0;
+        if(minxD > 10){
+            snprintf(minxDstr,sizeof(minxDstr),"%d",minxD);
+        }
+        else{
+            snprintf(minxDstr,sizeof(minxDstr),"0%d",minxD);
+        }
+    }
+    else if (maxxD - 20 < 10){
+        minxI = maxxI;
+        int jaj = maxxD - 20;
+        snprintf(minxDstr,sizeof(minxDstr),"0%d",jaj);
+    }
+    else{
+        minxD = maxxD - 20;
+        snprintf(minxDstr,sizeof(minxDstr),"%d",minxD);
+    }*/
     minyD = (int)(100*((0.0008*miny) - minyI));
     tensx = (int)(0.0008*vrx);
     tensy = (int)(0.0008*vry);
@@ -250,8 +366,16 @@ int main(void)
     __disable_interrupt();
 	WDTCTL = WDTPW | WDTHOLD;	// stop watchdog timer
     char canal = VRX;
-    char stringlcd[40];
+    char stringlcd[60];
+    char uartstring[60];
+    int contador = 0;
+    char stringcontador[60];
+    char stringvrx[60];
+    char stringvry[60];
+    char stringdecx [60];
+    char stringdecy [60];
     GPIOconfig();
+    USCI_A1_config();
     setUSCIB0master();
     UCB0I2CSA = 0x3F;
     i2c_write(0);
@@ -259,6 +383,7 @@ int main(void)
     TA0config();
     servoconfig();
 	configadc();
+	bt_str("\rCont: ---Canal A1----   ---Canal A2----\r\n");
 	__enable_interrupt();
 	while(TRUE){
 	    if(flag == 1){
@@ -267,41 +392,126 @@ int main(void)
             debounce(1200);
             lcdbyte(3,0);
             debounce(1200);
+            if(maxxD - 20 < 0){
+                minxI = (maxxI - 1 >= 0) ? maxxI - 1 : 0;
+                minxD = (maxxI > 0) ?  100 - maxxD : 0;
+                if(minxD > 10){
+                    snprintf(minxDstr,sizeof(minxDstr),"%d",minxD);
+                }
+                else{
+                    snprintf(minxDstr,sizeof(minxDstr),"0%d",minxD);
+                }
+            }
+            else if (maxxD - 20 < 10){
+                minxI = maxxI;
+                int jaj = maxxD - 20;
+                snprintf(minxDstr,sizeof(minxDstr),"0%d",jaj);
+            }
+            else{
+                minxD = maxxD - 20;
+                snprintf(minxDstr,sizeof(minxDstr),"%d",minxD);
+            }
+            if(contador < 10){
+                snprintf(stringcontador,sizeof(stringcontador),"000%d",contador);
+            }
+            else if(contador < 100){
+                snprintf(stringcontador,sizeof(stringcontador),"00%d",contador);
+            }
+            else if(contador < 1000){
+                snprintf(stringcontador,sizeof(stringcontador),"0%d",contador);
+            }
+            else{
+                snprintf(stringcontador,sizeof(stringcontador),"%d",contador);
+            }
+            if(vrx < 10){
+                snprintf(stringvrx,sizeof(stringvrx),"000%d",vrx);
+            }
+            else if (vrx < 100){
+                snprintf(stringvrx,sizeof(stringvrx),"00%d",vrx);
+            }
+            else if (vrx < 1000){
+                snprintf(stringvrx,sizeof(stringvrx),"0%d",vrx);
+            }
+            else{
+                snprintf(stringvrx,sizeof(stringvrx),"%d",vrx);
+            }
+
+            if(vry < 10){
+                snprintf(stringvry,sizeof(stringvry),"000%d",vrx);
+            }
+            else if (vry < 100){
+                snprintf(stringvry,sizeof(stringvry),"00%d",vry);
+            }
+            else if (vry < 1000){
+                snprintf(stringvry,sizeof(stringvry),"0%d",vry);
+            }
+            else{
+                snprintf(stringvry,sizeof(stringvry),"%d",vry);
+            }
+
 	        if(canal == VRX){
                 if(vrx < 10){
-                    snprintf(stringlcd,sizeof(stringlcd),"A1=%d,%d0V   000%d\nMn=%d,%d0  Mx=%d,%d0",tensx,decx,vrx,minxI,minxD,maxxI,maxxD);
+                    snprintf(stringdecx,sizeof(stringdecx),"0%d",decx);
+                    snprintf(stringlcd,sizeof(stringlcd),"A1=%d,%d0V   000%d\nMn=%d,%s  Mx=%d,%d0",tensx,decx,vrx,minxI,minxDstr,maxxI,maxxD);
+                    snprintf(uartstring,sizeof(uartstring),"\r%s: %s --> %d,%sV     %s --> %d,%sV\r\n",stringcontador,stringvrx,tensx,stringdecx,stringvry,tensy,stringdecy);
+
                 }
                 else if(vrx < 100){
-                    snprintf(stringlcd,sizeof(stringlcd),"A1=%d,%d0V   00%d\nMn=%d,%d0  Mx=%d,%d0",tensx,decx,vrx,minxI,minxD,maxxI,maxxD);
+                    snprintf(stringdecx,sizeof(stringdecx),"0%d",decx);
+                    snprintf(stringlcd,sizeof(stringlcd),"A1=%d,%d0V   00%d\nMn=%d,%s  Mx=%d,%d0",tensx,decx,vrx,minxI,minxDstr,maxxI,maxxD);
+                    snprintf(uartstring,sizeof(uartstring),"\r%s: %s --> %d,%sV     %s --> %d,%sV\r\n",stringcontador,stringvrx,tensx,stringdecx,stringvry,tensy,stringdecy);
+
 
                 }
                 else if(vrx < 1000){
-                    snprintf(stringlcd,sizeof(stringlcd),"A1=%d,%dV   0%d\nMn=%d,%d  Mx=%d,%d",tensx,decx,vrx,minxI,minxD,maxxI,maxxD);
+                    snprintf(stringdecx,sizeof(stringdecx),"%d",decx);
+                    snprintf(stringlcd,sizeof(stringlcd),"A1=%d,%dV   0%d\nMn=%d,%s  Mx=%d,%d",tensx,decx,vrx,minxI,minxDstr,maxxI,maxxD);
+                    snprintf(uartstring,sizeof(uartstring),"\r%s: %s --> %d,%sV     %s --> %d,%sV\r\n",stringcontador,stringvrx,tensx,stringdecx,stringvry,tensy,stringdecy);
+
                 }
                 else {
-                    snprintf(stringlcd,sizeof(stringlcd),"A1=%d,%dV   %d\nMn=%d,%d  Mx=%d,%d",tensx,decx,vrx,minxI,minxD,maxxI,maxxD);
+                    snprintf(stringdecx,sizeof(stringdecx),"%d",decx);
+                    snprintf(stringlcd,sizeof(stringlcd),"A1=%d,%dV   %d\nMn=%d,%s  Mx=%d,%d",tensx,decx,vrx,minxI,minxDstr,maxxI,maxxD);
+                    snprintf(uartstring,sizeof(uartstring),"\r%s: %s --> %d,%sV     %s --> %d,%sV\r\n",stringcontador,stringvrx,tensx,stringdecx,stringvry,tensy,stringdecy);
+
                 }
                 lcdWrite(stringlcd);
+                bt_str(uartstring);
 	            TA2CCR2 = 524 + round((0.33*vrx));
 	        }
 	        else{
                 if(vry < 10){
+                    snprintf(stringdecy,sizeof(stringdecy),"0%d",decy);
                     snprintf(stringlcd,sizeof(stringlcd),"A2=%d,%d0V   000%d\nMn=%d,%d0  Mx=%d,%d0",tensy,decy,vry,minyI,minyD,maxyI,maxyD);
+                    snprintf(uartstring,sizeof(uartstring),"\r%s: %s --> %d,%sV     %s --> %d,%sV\r\n",stringcontador,stringvrx,tensx,stringdecx,stringvry,tensy,stringdecy);
                 }
                 else if(vry < 100){
+                    snprintf(stringvry,sizeof(stringvry),"00%d",vry);
                     snprintf(stringlcd,sizeof(stringlcd),"A2=%d,%d0V   00%d\nMn=%d,%d0  Mx=%d,%d0",tensy,decy,vry,minyI,minyD,maxyI,maxyD);
+                    snprintf(uartstring,sizeof(uartstring),"\r%s: %s --> %d,%sV     %s --> %d,%sV\r\n",stringcontador,stringvrx,tensx,stringdecx,stringvry,tensy,stringdecy);
 
                 }
                 else if(vry < 1000){
+                    snprintf(stringdecy,sizeof(stringdecy),"%d",decy);
                     snprintf(stringlcd,sizeof(stringlcd),"A2=%d,%dV   0%d\nMn=%d,%d  Mx=%d,%d",tensy,decy,vry,minyI,minyD,maxyI,maxyD);
+                    snprintf(uartstring,sizeof(uartstring),"\r%s: %s --> %d,%sV     %s --> %d,%sV\r\n",stringcontador,stringvrx,tensx,stringdecx,stringvry,tensy,stringdecy);
                 }
                 else {
+                    snprintf(stringdecy,sizeof(stringdecy),"%d",decy);
                     snprintf(stringlcd,sizeof(stringlcd),"A2=%d,%dV   %d\nMn=%d,%d  Mx=%d,%d",tensy,decy,vry,minyI,minyD,maxyI,maxyD);
+                    snprintf(uartstring,sizeof(uartstring),"\r%s: %s --> %d,%sV     %s --> %d,%sV\r\n",stringcontador,stringvrx,tensx,stringdecx,stringvry,tensy,stringdecy);
                 }
                 lcdWrite(stringlcd);
+                bt_str(uartstring);
 	            TA2CCR2 =  524 + round((4095 - vry)*0.33);
 	        }
 	        debounce(1000);
+	        if(contador == 9999){
+	            contador = 0;
+	        }
+	        else{
+	            contador++;
+	        }
 	        if(sw_mon() == TRUE) canal ^= 1;
 	    }
 	}
