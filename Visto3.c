@@ -16,6 +16,7 @@
 #define BL BIT3
 #define RS BIT0
 #define EN BIT2
+#define PCF_ADDR 0x3F
 
 typedef unsigned char uint8;
 
@@ -301,7 +302,7 @@ int main(void)
     GPIOconfig();
     USCI_A1_config();
     setUSCIB0master();
-    UCB0I2CSA = 0x3F;
+    UCB0I2CSA = PCF_ADDR;
     i2c_write(0);
     lcd_inic();
     TA0config();
