@@ -1,4 +1,5 @@
-#include <msp430.h> 
+#include <msp430.h>
+#define TRUE 1
 
 void config_leds(void){
     P4DIR |= BIT7;
@@ -11,8 +12,11 @@ void config_leds(void){
 
 void config_timers(void){
     TA0CTL = TASSEL__SMCLK | MC__UP;
+    TA0CCTL1 = OUTMOD_7;
     TA0CCR0 = 8192;
     TA0CCR1 = 4096;
+    P1SEL |= BIT2;
+    P1DIR |= BIT2;
 }
 
 int main(void)
@@ -21,14 +25,7 @@ int main(void)
     config_leds();
     config_timers();
 
-    while (2>1){
-        while (!(TA0CCTL1 & CCIFG));
-        TA0CCTL1 &= ~CCIFG;
-        P1OUT &= ~BIT0;
-
-        while (!(TA0CTL & TAIFG));
-        TA0CTL &= ~TAIFG;
-        P1OUT |= BIT0;
+    while (TRUE){
     }
     return 0;
 }
