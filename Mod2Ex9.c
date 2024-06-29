@@ -21,7 +21,7 @@ void config_chaves(void){
 void config_timers(void){
     TA0CTL = TASSEL__SMCLK | MC__UP;
     TA0CCR0 = 8192;
-    TA0CCR1 = 8192 / 32;
+    TA0CCR1 = 4096;
 }
 
 int main(void)
