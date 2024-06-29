@@ -8,15 +8,6 @@ void config_leds(void){
     P1OUT &= ~BIT0;
 }
 
-void config_chaves(void){
-    P2DIR &= ~BIT1;
-    P2REN |= BIT1;
-    P2OUT |= BIT1;
-
-    P1DIR &= ~BIT1;
-    P1REN |= BIT1;
-    P1OUT |= BIT1;
-}
 
 void config_timers(void){
     TA0CTL = TASSEL__SMCLK | MC__UP;
