@@ -24,7 +24,7 @@ StopWDT     mov.w   #WDTPW|WDTHOLD,&WDTCTL  ; Stop watchdog timer
 ; Main loop here
 ;-------------------------------------------------------------------------------
 ; I = 0x0001, V= 0x0005, X = 0x0000A, L= 0x0032, C= 0x0074, M= 0x03E8
-NUM			.equ	730
+NUM			.equ	1488
 ;
 
 			mov #NUM,R5
